@@ -115,7 +115,7 @@ data.Wales[data.Wales$TIME_PERIOD == 0,]
 
 ###   convert data to a time-series
 
-library('forecast')
+# library('forecast')
 data.ts <- ts(data.Wales$Value, start=c(2011,7,1), end=c(2017,7,1), frequency = 12)
 
 plot(data.ts)
@@ -125,3 +125,68 @@ summary(data.ts)
 abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
 
 
+
+
+#######################################################################################
+######################             MODELING               ######################
+#######################################################################################
+
+selected.months.number = 36  #  selected number of months we want to predict
+
+##### method stl #####
+dekomp_stl <- stl(data.ts,s.window = 'periodic')
+# resid.sum.train <- sum(abs(dekomp_stl$time.series[,'remainder']))
+# resid.sum.train.relative <- resid.sum.train/sum(data.ts)
+
+library(forecast)
+prediction <- forecast::forecast(dekomp_stl, h = selected.months.number)
+# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
+# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
+# less.than.2percent <- resid.sum.valid.relative < 0.02
+
+plot(dekomp_stl)
+plot(prediction)
+
+
+
+##### method ets #####
+
+model.ets <- ets(data.ts)
+model.ets$fitted - data.ts
+
+resid.sum.train <- sum(abs(model.ets$fitted - data.ts))
+resid.sum.train.relative <- resid.sum.train/sum(data.ts)
+
+prediction <- forecast(model.ets, h=selected.months.number)
+# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
+# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
+
+plot(prediction)
+
+
+##### method ARIMAfit #####
+
+ARIMAfit <- auto.arima(data.ts, approximation=FALSE,trace=FALSE)
+# XX more parameters can be added
+
+resid.sum.train <- sum(abs(ARIMAfit$residuals))
+resid.sum.train.relative <- resid.sum.train / sum(data.ts)
+
+prediction <- forecast(ARIMAfit, h = selected.months.number)
+# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
+# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
+
+plot(prediction)
+
+
+##### method HoltWinters #####
+
+HW <- HoltWinters(data.ts)
+resid.sum.train <- sum(abs(residuals(HW)))
+resid.sum.train.relative <- resid.sum.train / sum(data.ts)
+
+prediction <- predict(HW, selected.months.number)
+# resid.sum.valid <-sum(abs(na.remove(prediction - valid.model)))
+# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
+
+plot(prediction)
