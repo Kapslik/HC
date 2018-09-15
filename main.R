@@ -1,6 +1,6 @@
 ###   assignment solution for Heidelberg Cement company
 ###
-###   author:    Filip Antol
+###   author:    Kapslik
 ###   created:   15.9.2018
 ###   purpose:   analyze data regarding Number of new houses approved in Australia. Further instructions are in the "Big Data Exercise.docx" file
 
