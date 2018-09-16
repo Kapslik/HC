@@ -1,17 +1,46 @@
-###   assignment solution for Heidelberg Cement company
+###   assignment solution for HC company
 ###
-###   author:    Kapslik
+###   author:    Kapslik (FA)
 ###   created:   15.9.2018
-###   purpose:   analyze data regarding Number of new houses approved in Australia. Further instructions are in the "Big Data Exercise.docx" file
+###   platform:  Windows 7
+###   purpose:   analyze data regarding Number of new houses approved in Australia. 
+###              Further instructions are in the "Big Data Exercise.docx" file (not in repository)
+###   
+###   structure: This is the main script in which:
+###
+###               > data manipulation:
+###                  > data is downloaded and loaded
+###                  > data is transformed from JSON format to data.frame
+###                  > data is cleaned: attributes divided, meaningless attributes removed, transposed etc.
+###                  > a specific subset of data is extracted
+###
+###               > model selection:
+###                  > the "run_ts_models.R" script is sourced for comparison of selected time-series models
+###                  > models considered: 
+###                     > ARIMA
+###                     > Holt-WInters
+###                     > Seasonal Decomposition by Loess (STL)
+###                     > Exponential smoothing state space model (ETS)
+###                  > FInal model is selected, based on the comparison table
+###
+###               > prediction:
+###                  > using the best selected model
+###
+###   
+
+# 
+
 
 
 rm(list=ls())
-setwd("C:/Users/Vapno/Documents/a Jobs/HeidelbergCement/R files")
+setwd("C:/Users/Vapno/Documents/a Jobs/HeidelbergCement/R files")  #  set your working directory here. Hint: getwd()
 
 
 
 library(jsonlite)     # flexible, robust, high performance tools for working with JSON in R
 # library(downloader)   # Download Files over HTTP and HTTPS  #  only if you want to download the data again
+library(tseries)     # run_ts_models.R
+library(forecast)    # run_ts_models.R
 
 
 ####################################
@@ -20,21 +49,32 @@ library(jsonlite)     # flexible, robust, high performance tools for working wit
 data.url.source=paste0("http://stat.data.abs.gov.au/sdmx-json/data/ABS_BA_SA2_ASGS2016/1.9.1...0+1+102+1GSYD+10201.M/all?detail=Full&dimensionAtObservation=AllDimensions&startPeriod=2011-07&endPeriod=2017-07")
 data.local.path = "data/Australian_data"
 
+selected.asgs.2016 = "New South Wales"
+selected.building.type = "Houses"
+data.frequency <- 12
 
 ####################################
 ######   Data definition
 
-# download(data.url.source,dest=data.local.path)
+# download(data.url.source,dest=data.local.path) # not neccessary
 data.json = jsonlite::fromJSON(data.local.path)  #  can be loaded directly from data.url.source
-data.main = data.json$dataSets
 data.obs = data.json$dataSets$observations
 
-ts.begin = min(data.json$structure$dimensions$observation$values[[8]][,1]) # beginning of time-series
-ts.end = max(data.json$structure$dimensions$observation$values[[8]][,1])   # end of time-series
+##  manuall assignment of numbers to attributes by their order. Based on the raw data file footer.
+data.levels.order.number <- list("BUILDING_TYPE" = 4,
+                                 "REGIONTYPE" = 5,
+                                 "ASGS_2016" = 6,
+                                 "TIME" = 8)
+
+ts.begin = min(data.json$structure$dimensions$observation$values[[data.levels.order.number$TIME]][,1]) # beginning of time-series
+ts.end = max(data.json$structure$dimensions$observation$values[[data.levels.order.number$TIME]][,1])   # end of time-series
+
 
 
 ###   data description
 names(data.json)
+str(data.json)
+summary(data.json)
 data.json$header
 data.json$structure$dimensions$observation         #  predictors
 data.json$structure$dimensions$observation$values  #  predictors' values
@@ -76,9 +116,12 @@ rm(clean.category,clean.values, data.obs.t)
 # data.json$structure$dimensions$observation$values[[4]]
 # data.json$structure$dimensions$observation$values[[5]]
 # data.json$structure$dimensions$observation$values[[6]]
-levels(data.all.columns$BUILDING_TYPE) <- as.vector(data.json$structure$dimensions$observation$values[[4]]$name)
-levels(data.all.columns$REGIONTYPE) <- as.vector(data.json$structure$dimensions$observation$values[[5]]$name)
-levels(data.all.columns$ASGS_2016) <- as.vector(data.json$structure$dimensions$observation$values[[6]]$name)
+levels(data.all.columns$BUILDING_TYPE) <- 
+   as.vector(data.json$structure$dimensions$observation$values[[data.levels.order.number$BUILDING_TYPE]]$name)
+levels(data.all.columns$REGIONTYPE) <- 
+   as.vector(data.json$structure$dimensions$observation$values[[data.levels.order.number$REGIONTYPE]]$name)
+levels(data.all.columns$ASGS_2016) <- 
+   as.vector(data.json$structure$dimensions$observation$values[[data.levels.order.number$ASGS_2016]]$name)
 
 
 
@@ -99,15 +142,12 @@ data.clean$TIME_PERIOD <- as.integer(as.character(data.clean$TIME_PERIOD))
 
 ###   Extract one particular time series – Total number of new houses in New South Wales
 
-selected.asgs.2016 = "New South Wales"
-selected.building.type = "Houses"
 
-data.Wales <- data.clean[data.clean$ASGS_2016 %in% selected.asgs.2016 
-                         & data.clean$BUILDING_TYPE %in% selected.building.type,]
-data.Wales
+data.Wales <- data.clean[data.clean$ASGS_2016 %in% selected.asgs.2016 &
+                         data.clean$BUILDING_TYPE %in% selected.building.type, ]
 
 
-###   Check the hint from the instructions
+###   Check the hint from the instructions :)
 
 data.clean[data.clean$Value == 1511,]
 data.Wales[data.Wales$TIME_PERIOD == 0,]
@@ -116,7 +156,7 @@ data.Wales[data.Wales$TIME_PERIOD == 0,]
 ###   convert data to a time-series
 
 # library('forecast')
-data.ts <- ts(data.Wales$Value, start=c(2011,7,1), end=c(2017,7,1), frequency = 12)
+data.ts <- ts(data.Wales$Value, start=c(2011,7,1), end=c(2017,7,1), frequency = data.frequency)
 
 summary(data.ts)
 plot(data.ts)
@@ -197,90 +237,37 @@ resid.sum.train.relative <- resid.sum.train / sum(train.ts)
 
 prediction <- forecast::forecast(ARIMAfit, h = selected.test.set.size)
 
-plot(ARIMAfit)
 plot(prediction)
-# matplot(time(data.ts), data.ts, type='l', lty=1)
-# matplot(time(prediction), prediction, type='l', lty=1)
-# matlines(time(data.ts), data.ts, type='l', lty=1, lwd=2, col='red')
-# matlines(time(prediction), prediction, type='l', lty=1)
 
-matlines(time(data.ts)[(train.set.size+1):length(time(data.ts))], 
-         data.ts[(train.set.size+1):length(time(data.ts))], 
+###   compare final model with the test data
+matlines(time(test.ts), 
+         test.ts, 
          type='l', lty=1, lwd=2, col='red')
-#
+resid.sum.test <- sum(abs(na.remove(prediction$mean - test.ts)))
+resid.sum.valid.relative <- resid.sum.test / sum(test.ts) # 12% in the optimistic direction.
 
 
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-##### fun and experiments with individual models #####
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-
+###   PREDICT for the next 3 years
 
 selected.months.number = 36  #  selected number of months we want to predict
-selected.window.type <- 'periodic'
+img.hline.seq <- seq(1000,4000, by=500)
 
-##### method stl #####
-dekomp.stl <- stl(data.ts,s.window = selected.window.type)
-# resid.sum.train <- sum(abs(dekomp.stl$time.series[,'remainder']))
-# resid.sum.train.relative <- resid.sum.train/sum(data.ts)
+ARIMAfit <- auto.arima(train.ts, approximation=FALSE,trace=FALSE)
+prediction <- forecast::forecast(ARIMAfit, h = selected.test.set.size + selected.months.number)
 
-# library(forecast)
-prediction <- forecast::forecast(dekomp.stl, h = selected.months.number)
-# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
-# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
-# less.than.2percent <- resid.sum.valid.relative < 0.02
-
-plot(dekomp.stl)
+par(mfrow=c(1,2))
 plot(prediction)
+matlines(time(test.ts), 
+         test.ts, 
+         type='l', lty=1, lwd=2, col='red')
+abline(h=img.hline.seq, col='red', lty=2)
 
 
-###  method stl for log()
+###   using entire dataset for training
+ARIMAfit.full.train <- auto.arima(data.ts, approximation=FALSE,trace=FALSE)
+prediction.full.train  <- forecast::forecast(ARIMAfit.full.train, h = selected.months.number)
 
-dekomp.stl.log <- stl(log(data.ts), s.window = selected.window.type)
-prediction <- forecast::forecast(dekomp.stl.log, h = selected.months.number)
-plot(dekomp.stl.log)
-plot(prediction)
+plot(prediction.full.train)
+abline(h=img.hline.seq, col='red', lty=2)
+par(mfrow=c(1,1))
 
-
-##### method ets #####
-
-model.ets <- ets(data.ts)
-model.ets$fitted - data.ts
-
-resid.sum.train <- sum(abs(model.ets$fitted - data.ts))
-resid.sum.train.relative <- resid.sum.train/sum(data.ts)
-
-prediction <- forecast(model.ets, h=selected.months.number)
-# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
-# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
-
-plot(prediction)
-
-
-##### method ARIMAfit #####
-
-ARIMAfit <- auto.arima(data.ts, approximation=FALSE,trace=FALSE)
-# XX more parameters can be added
-
-resid.sum.train <- sum(abs(ARIMAfit$residuals))
-resid.sum.train.relative <- resid.sum.train / sum(data.ts)
-
-prediction <- forecast(ARIMAfit, h = selected.months.number)
-# resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
-# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
-
-plot(prediction)
-
-
-##### method HoltWinters #####
-
-HW <- HoltWinters(data.ts)
-resid.sum.train <- sum(abs(residuals(HW)))
-resid.sum.train.relative <- resid.sum.train / sum(data.ts)
-
-prediction <- predict(HW, selected.months.number)
-# resid.sum.valid <-sum(abs(na.remove(prediction - valid.model)))
-# resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
-
-plot(prediction)

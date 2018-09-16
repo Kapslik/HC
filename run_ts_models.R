@@ -2,14 +2,11 @@
 # Function fits in ets, stl, HoltWinters and ARIMAfit models for sequencies of parameters with a single data.frame as output, which should be basis for choosing the best performing method.
 # 
 # input:
-#    frequencies = sequence of frequencies for the time-series data
 #    valid.sizes = sequence of sizes of the validation set 
 #                   (last n observations that will be excluded from the training set
 #                    and on which the models will be evaluated)
 #    test.sizes = sequence of number of observations to be left out for test set.
 #                 Same as valid.sizes
-#    models.set = if input is multiple-series, each series must be specified
-#                 in the original case, this is sequence c('AA','BB','CC','AA+BB+CC')
 # 
 # output:
 #    Single data.frame with results of all the methods for comparison
