@@ -139,29 +139,34 @@ plot(log(data.ts))
 
 source('run_ts_models.R')
 
-valid.sizes = c(14)
-valid.sizes = c(21)
-test.sizes = c(21)
-test.sizes = c(1)
+valid.sizes = c(6,12,18,24)
+test.sizes = c(12)
 
-results <- run_ts_models(data.to.analyze = data.Wales$Value, 
-                         valid.sizes = valid.sizes,
-                         test.sizes = test.sizes,
-                         ts.start = c(2011,7,1),
-                         ts.end = c(2017,7,1),
-                         ts.freq = 12)
+time.start <- Sys.time()
+#  2 valid sizes and 2 test.sizes took approx. 7 seconds
+system.time(results <- run_ts_models(data.to.analyze = data.Wales$Value, 
+                                     valid.sizes = valid.sizes,
+                                     test.sizes = test.sizes,
+                                     ts.start = c(2011,7,1),
+                                     ts.end = c(2017,7,1),
+                                     ts.freq = 12))
+time.end <- Sys.time()
+time.taken <- time.end - time.start
+time.taken
+
 # lapply(results,class)
 # View(results)
 # colnames(results)
 # mena <- colnames(results)
-colnames(results) <- c("t.s.", "v.s.", "method",
-                       "resid.t", "resid.t.rel", "resid.v", "resid.v.rel",
-                       "< 2%")
+
 # results[with(results, order(results$resid.v)),]
 
 ## displaying ordered output
-results <- results[,-c(4,6,8)]
-table.of.results <- results[with(results, order(results$method, results$resid.v.rel)),]
+# results <- results[,-c(4,6,8)]
+results <- results[,-c(8)]
+results
+# table.of.results <- results[with(results, order(results$method, results$resid.v.rel)),]
+table.of.results <- results[with(results, order(results$`relative SSR validation`)),]
 View(table.of.results)
 
 
@@ -174,8 +179,35 @@ View(table.of.results)
 
 
 
+#####     single best model
+selected.test.set.size <- 12
 
 
+train.set.size <- length(data.ts) - selected.test.set.size
+train.ts <- window(data.ts, 
+                   end = time(data.ts)[train.set.size])
+test.ts  <- window(data.ts, 
+                   start = time(data.ts)[train.set.size + 1])
+
+
+ARIMAfit <- auto.arima(train.ts, approximation=FALSE,trace=FALSE)
+
+resid.sum.train <- sum(abs(ARIMAfit$residuals))
+resid.sum.train.relative <- resid.sum.train / sum(train.ts)
+
+prediction <- forecast::forecast(ARIMAfit, h = selected.test.set.size)
+
+plot(ARIMAfit)
+plot(prediction)
+# matplot(time(data.ts), data.ts, type='l', lty=1)
+# matplot(time(prediction), prediction, type='l', lty=1)
+# matlines(time(data.ts), data.ts, type='l', lty=1, lwd=2, col='red')
+# matlines(time(prediction), prediction, type='l', lty=1)
+
+matlines(time(data.ts)[(train.set.size+1):length(time(data.ts))], 
+         data.ts[(train.set.size+1):length(time(data.ts))], 
+         type='l', lty=1, lwd=2, col='red')
+#
 
 
 

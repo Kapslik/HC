@@ -47,7 +47,12 @@ run_ts_models <- function(data.to.analyze,
                                   resid.sum.valid.relative = numeric(),
                                   less.than.2percent = logical() )
   
-  
+  colnames(results.tab) <- c("train size", "validation size", "method",
+                             "resid.t", "resid.t.rel", "resid.v", "resid.v.rel",
+                             "< 2%")
+  colnames(results.tab) <- c("train size", "validation size", "method",
+                             "SSR training", "relative SSR training", "SSR validation", "relative SSR validation",
+                             "< 2%")
   
      data.ts <- ts(data.to.analyze, start=ts.start, end=ts.end, frequency = ts.freq)
      
@@ -67,8 +72,7 @@ run_ts_models <- function(data.to.analyze,
                               start = time(data.ts)[train.set.size + valid.set.size + 1])
            
            ###   checking the split
-           class(test.ts)
-           dim(data.ts)
+           
            check.split <- c(train.ts,valid.ts, test.ts)
            if(sum(check.split == data.to.analyze) != length(data.to.analyze)){
               stop('data splitting error - some data were changed.')
@@ -76,6 +80,7 @@ run_ts_models <- function(data.to.analyze,
            if(length(train.ts) + length(test.ts) + length(valid.ts) != length(data.ts)){
               stop('data splitting error - some data were lost.')
            }
+           rm(check.split)
            
            
            ########    modelling    ########
@@ -91,12 +96,10 @@ run_ts_models <- function(data.to.analyze,
            prediction <- forecast::forecast(dekomp_stl, h = valid.set.size)
            resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.ts)))
            resid.sum.valid.relative <- resid.sum.valid / sum(valid.ts)
-           less.than.2percent <- resid.sum.valid.relative < 0.02
            
            results.tab <- add.to.results.tab(results.tab, train.set.size, valid.set.size, method, 
                                              resid.sum.train, resid.sum.train.relative,
-                                             resid.sum.valid, resid.sum.valid.relative, 
-                                             less.than.2percent)
+                                             resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, dekomp_stl, prediction, resid.sum.train, resid.sum.train.relative, 
               resid.sum.valid, resid.sum.valid.relative, less.than.2percent)
@@ -114,12 +117,10 @@ run_ts_models <- function(data.to.analyze,
            prediction <- forecast::forecast(model.ets, h=valid.set.size)
            resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.ts)))
            resid.sum.valid.relative <- resid.sum.valid / sum(valid.ts)
-           less.than.2percent <- resid.sum.valid.relative < 0.02
            
            results.tab <- add.to.results.tab(results.tab, train.set.size, valid.set.size, method, 
                                              resid.sum.train, resid.sum.train.relative,
-                                             resid.sum.valid, resid.sum.valid.relative, 
-                                             less.than.2percent)
+                                             resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, resid.sum.train, resid.sum.train.relative, 
               resid.sum.valid, resid.sum.valid.relative, less.than.2percent)
@@ -129,7 +130,7 @@ run_ts_models <- function(data.to.analyze,
            
            method <- 'ARIMAfit'
            ARIMAfit <- auto.arima(train.ts, approximation=FALSE,trace=FALSE)
-           # XX tu dalsie parametre este pridat by sli
+           # XX more parameters might be added
            
            resid.sum.train <- sum(abs(ARIMAfit$residuals))
            resid.sum.train.relative <- resid.sum.train / sum(train.ts)
@@ -137,12 +138,10 @@ run_ts_models <- function(data.to.analyze,
            prediction <- forecast::forecast(ARIMAfit, h = valid.set.size)
            resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.ts)))
            resid.sum.valid.relative <- resid.sum.valid / sum(valid.ts)
-           less.than.2percent <- resid.sum.valid.relative < 0.02
            
            results.tab <- add.to.results.tab(results.tab, train.set.size, valid.set.size, method, 
                                              resid.sum.train, resid.sum.train.relative,
-                                             resid.sum.valid, resid.sum.valid.relative, 
-                                             less.than.2percent)
+                                             resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, ARIMAfit, resid.sum.train, resid.sum.train.relative, 
               resid.sum.valid, resid.sum.valid.relative, less.than.2percent, prediction)
@@ -158,13 +157,11 @@ run_ts_models <- function(data.to.analyze,
            prediction <- predict(HW, valid.set.size)
            resid.sum.valid <-sum(abs(na.remove(prediction - valid.ts)))
            resid.sum.valid.relative <- resid.sum.valid / sum(valid.ts)
-           less.than.2percent <- resid.sum.valid.relative < 0.02
            
            
            results.tab <- add.to.results.tab(results.tab, train.set.size, valid.set.size, method, 
                                              resid.sum.train, resid.sum.train.relative,
-                                             resid.sum.valid, resid.sum.valid.relative, 
-                                             less.than.2percent)
+                                             resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, HW, resid.sum.train, resid.sum.train.relative, 
               resid.sum.valid, resid.sum.valid.relative, less.than.2percent, prediction)
@@ -176,8 +173,9 @@ run_ts_models <- function(data.to.analyze,
 
 
 add.to.results.tab <- function(tab, train.set.size, valid.set.size, method, resid.sum.train, resid.sum.train.relative, 
-                               resid.sum.valid, resid.sum.valid.relative, less.than.2percent) {
+                               resid.sum.valid, resid.sum.valid.relative) {
    ##  function adds results to the table of results
+   
    new.row <- nrow(tab) + 1
    tab[new.row, 1] <- train.set.size
    tab[new.row, 2] <- valid.set.size
@@ -186,7 +184,7 @@ add.to.results.tab <- function(tab, train.set.size, valid.set.size, method, resi
    tab[new.row, 5] <- round(resid.sum.train.relative, 4)
    tab[new.row, 6] <- round(resid.sum.valid, 2)
    tab[new.row, 7] <- round(resid.sum.valid.relative, 4)
-   tab[new.row, 8] <- less.than.2percent
+   tab[new.row, 8] <- resid.sum.valid.relative < 0.02
    
    return(tab)
    
