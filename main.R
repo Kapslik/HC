@@ -150,11 +150,14 @@ data.Wales[data.Wales$TIME_PERIOD == 0,]
 
 ###   convert data to a time-series and have a look
 
-# data.ts <- ts(data.Wales$Value, start=ts.input$begin, end=ts.input$end, frequency = ts.input$freq)
+data.ts <- ts(data.Wales$Value, start=ts.input$begin, end=ts.input$end, frequency = ts.input$freq)
 # summary(data.ts)
 # plot(data.ts)
 # abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
 
+###   decomposition insight
+dekomp.stl <- stl(data.ts,s.window = 'periodic')
+plot(dekomp.stl)
 
 
 
