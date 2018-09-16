@@ -118,11 +118,12 @@ data.Wales[data.Wales$TIME_PERIOD == 0,]
 # library('forecast')
 data.ts <- ts(data.Wales$Value, start=c(2011,7,1), end=c(2017,7,1), frequency = 12)
 
-plot(data.ts)
-matplot(time(data.ts), data.ts, type='l', lty=1)
-
 summary(data.ts)
+plot(data.ts)
+# matplot(time(data.ts), data.ts, type='l', lty=1)
 abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
+plot(log(data.ts))
+
 
 
 
@@ -131,22 +132,83 @@ abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
 ######################             MODELING               ######################
 #######################################################################################
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+##### Running all the models for comparison #####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+source('run_ts_models.R')
+
+valid.sizes = c(14)
+valid.sizes = c(21)
+test.sizes = c(21)
+test.sizes = c(1)
+
+results <- run_ts_models(data.to.analyze = data.Wales$Value, 
+                         valid.sizes = valid.sizes,
+                         test.sizes = test.sizes,
+                         ts.start = c(2011,7,1),
+                         ts.end = c(2017,7,1),
+                         ts.freq = 12)
+# lapply(results,class)
+# View(results)
+# colnames(results)
+# mena <- colnames(results)
+colnames(results) <- c("t.s.", "v.s.", "method",
+                       "resid.t", "resid.t.rel", "resid.v", "resid.v.rel",
+                       "< 2%")
+# results[with(results, order(results$resid.v)),]
+
+## displaying ordered output
+results <- results[,-c(4,6,8)]
+table.of.results <- results[with(results, order(results$method, results$resid.v.rel)),]
+View(table.of.results)
+
+
+## saving and loading the data results
+## table.of.results <- results[with(results, order(results$model, results$resid.v.rel)),]
+save(table.of.results, file='table.of.results')
+load('table.of.results')
+View(table.of.results)
+#
+
+
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+##### fun and experiments with individual models #####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+
 selected.months.number = 36  #  selected number of months we want to predict
+selected.window.type <- 'periodic'
 
 ##### method stl #####
-dekomp_stl <- stl(data.ts,s.window = 'periodic')
-# resid.sum.train <- sum(abs(dekomp_stl$time.series[,'remainder']))
+dekomp.stl <- stl(data.ts,s.window = selected.window.type)
+# resid.sum.train <- sum(abs(dekomp.stl$time.series[,'remainder']))
 # resid.sum.train.relative <- resid.sum.train/sum(data.ts)
 
-library(forecast)
-prediction <- forecast::forecast(dekomp_stl, h = selected.months.number)
+# library(forecast)
+prediction <- forecast::forecast(dekomp.stl, h = selected.months.number)
 # resid.sum.valid <- sum(abs(na.remove(prediction$mean - valid.model)))
 # resid.sum.valid.relative <- resid.sum.valid / sum(valid.model)
 # less.than.2percent <- resid.sum.valid.relative < 0.02
 
-plot(dekomp_stl)
+plot(dekomp.stl)
 plot(prediction)
 
+
+###  method stl for log()
+
+dekomp.stl.log <- stl(log(data.ts), s.window = selected.window.type)
+prediction <- forecast::forecast(dekomp.stl.log, h = selected.months.number)
+plot(dekomp.stl.log)
+plot(prediction)
 
 
 ##### method ets #####
