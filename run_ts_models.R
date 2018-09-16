@@ -1,15 +1,8 @@
 # this whole script is a single function run_ts_models created to try several models for a time-series prediction.
 # Function fits in ets, stl, HoltWinters and ARIMAfit models for sequencies of parameters with a single data.frame as output, which should be basis for choosing the best performing method.
 # 
-# input:
-#    valid.sizes = sequence of sizes of the validation set 
-#                   (last n observations that will be excluded from the training set
-#                    and on which the models will be evaluated)
-#    test.sizes = sequence of number of observations to be left out for test set.
-#                 Same as valid.sizes
 # 
-# output:
-#    Single data.frame with results of all the methods for comparison
+
 
 
 
@@ -18,20 +11,32 @@ library(forecast)
 
 
 
-## recommended input:
-# frequencies = c(7,30)
-# valid.sizes = c(14)
-# test.sizes = c(21)
-# models.set = c('AA','BB','CC','AA+BB+CC')
-
-
 run_ts_models <- function(data.to.analyze, 
                           valid.sizes, 
                           test.sizes,
                           ts.start,
                           ts.end,
                           ts.freq) {
-  
+   # function returns comparison of different time-series analysis methods
+   # function runs models for different sizes of training, validation and testing data and returns table of comparison
+   # resulting table includes sums of squared errors (SSE) on validation data, that can be used for model selection.
+   # testing dataset is not "looked at" in this function.
+   #
+   # input:
+   #     data.to.analyze = ordered vector of values in time.
+   #     valid.sizes = sequence of sizes of the validation set 
+   #                    (last n observations that will be excluded from the training set
+   #                    and on which the models will be evaluated)
+   #                    e.g. c(12,24)
+   #     test.sizes  = sequence of number of observations to be left out for test set.
+   #                    Same as valid.sizes
+   #                    e.g. c(12,24)
+   #     ts.start    = start parameter passed to the ts() function, e.g. c(2017,7,1)
+   #     ts.end      = end parameter passed to the ts() function, e.g. c(2017,7,1)
+   #     ts.freq     = freq parameter passed to the ts() function, e.g. 12
+   # 
+   # output:
+   #    Single data.frame with results of all the methods for comparison
   
   results.tab <- data.frame(train.set.size = integer(),
                                   valid.set.size = integer(),
@@ -43,10 +48,7 @@ run_ts_models <- function(data.to.analyze,
                                   resid.sum.valid = numeric(),
                                   resid.sum.valid.relative = numeric(),
                                   less.than.2percent = logical() )
-  
-  colnames(results.tab) <- c("train size", "validation size", "method",
-                             "resid.t", "resid.t.rel", "resid.v", "resid.v.rel",
-                             "< 2%")
+
   colnames(results.tab) <- c("train size", "validation size", "method",
                              "SSR training", "relative SSR training", "SSR validation", "relative SSR validation",
                              "< 2%")
@@ -55,8 +57,8 @@ run_ts_models <- function(data.to.analyze,
      
      ##### splitting the data #####
      
-     for(valid.set.size in valid.sizes) {# cycle ends at the end of script
-        for(test.set.size in test.sizes) {# cycle ends at the end of script
+     for(valid.set.size in valid.sizes) {
+        for(test.set.size in test.sizes) {
            
            train.set.size <- length(data.ts) - test.set.size - valid.set.size
            
@@ -99,7 +101,7 @@ run_ts_models <- function(data.to.analyze,
                                              resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, dekomp_stl, prediction, resid.sum.train, resid.sum.train.relative, 
-              resid.sum.valid, resid.sum.valid.relative, less.than.2percent)
+              resid.sum.valid, resid.sum.valid.relative)
            
            
            ##### method ets #####
@@ -120,7 +122,7 @@ run_ts_models <- function(data.to.analyze,
                                              resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, resid.sum.train, resid.sum.train.relative, 
-              resid.sum.valid, resid.sum.valid.relative, less.than.2percent)
+              resid.sum.valid, resid.sum.valid.relative)
            
            
            ##### method ARIMAfit #####
@@ -141,7 +143,7 @@ run_ts_models <- function(data.to.analyze,
                                              resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, ARIMAfit, resid.sum.train, resid.sum.train.relative, 
-              resid.sum.valid, resid.sum.valid.relative, less.than.2percent, prediction)
+              resid.sum.valid, resid.sum.valid.relative, prediction)
            
            
            ##### method HoltWinters #####
@@ -161,9 +163,9 @@ run_ts_models <- function(data.to.analyze,
                                              resid.sum.valid, resid.sum.valid.relative)
            
            rm(method, HW, resid.sum.train, resid.sum.train.relative, 
-              resid.sum.valid, resid.sum.valid.relative, less.than.2percent, prediction)
-        }
-     }
+              resid.sum.valid, resid.sum.valid.relative, prediction)
+        } # end for test.set.size
+     } # end for valid.set.size
   return(results.tab)
 }
 

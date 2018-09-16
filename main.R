@@ -51,27 +51,28 @@ data.local.path = "data/Australian_data"
 
 selected.asgs.2016 = "New South Wales"
 selected.building.type = "Houses"
-data.frequency <- 12
 
-####################################
-######   Data definition
+# user's input about the time series analyzed
+ts.input <- list('freq' = 12,
+                 'begin' = c(2011,7,1),  # beginning of time-series
+                 'end' = c(2017,7,1))    # end of time-series)
 
-# download(data.url.source,dest=data.local.path) # not neccessary
-data.json = jsonlite::fromJSON(data.local.path)  #  can be loaded directly from data.url.source
-data.obs = data.json$dataSets$observations
-
-##  manuall assignment of numbers to attributes by their order. Based on the raw data file footer.
+#  manual assignment of numbers to attributes by their order. Based on the raw data file footer.
 data.levels.order.number <- list("BUILDING_TYPE" = 4,
                                  "REGIONTYPE" = 5,
                                  "ASGS_2016" = 6,
                                  "TIME" = 8)
 
-ts.begin = min(data.json$structure$dimensions$observation$values[[data.levels.order.number$TIME]][,1]) # beginning of time-series
-ts.end = max(data.json$structure$dimensions$observation$values[[data.levels.order.number$TIME]][,1])   # end of time-series
+
+####################################
+######   Data definition
+
+# downloader::download(data.url.source,dest=data.local.path) # not neccessary
+data.json = jsonlite::fromJSON(data.local.path)  #  can be loaded directly from data.url.source
+data.obs = data.json$dataSets$observations       #  obs stands for observations
 
 
-
-###   data description
+###   basic data description
 names(data.json)
 str(data.json)
 summary(data.json)
@@ -81,16 +82,16 @@ data.json$structure$dimensions$observation$values  #  predictors' values
 data.json$structure$attributes$observation         #  units
 
 
+####################################
 #####     data columns refactoring
 
-###   transpose dataframe
+###   transpose dataframe and name columns
 
 data.obs.tr <- as.data.frame(t(data.obs))
 data.obs.t <- cbind(rownames(data.obs.tr),data.obs.tr)
 rm(data.obs.tr)
 rownames(data.obs.t) <- NULL
 colnames(data.obs.t) <- c('category', 'values')
-head(data.obs.t)
 
 
 ###   separate values into columns and set names
@@ -105,17 +106,12 @@ clean.values <- data.frame(do.call('rbind',strsplit(substr(as.character(data.obs
                                                     , fixed=TRUE)))
 
 data.all.columns <- cbind(clean.category,clean.values)
-head(data.all.columns)
 rm(clean.category,clean.values, data.obs.t)
 
 
 ###   set correctly factors' values
 
 # sapply(data.all.columns, levels)
-# levels(data.all.columns$BUILDING_TYPE)
-# data.json$structure$dimensions$observation$values[[4]]
-# data.json$structure$dimensions$observation$values[[5]]
-# data.json$structure$dimensions$observation$values[[6]]
 levels(data.all.columns$BUILDING_TYPE) <- 
    as.vector(data.json$structure$dimensions$observation$values[[data.levels.order.number$BUILDING_TYPE]]$name)
 levels(data.all.columns$REGIONTYPE) <- 
@@ -127,21 +123,19 @@ levels(data.all.columns$ASGS_2016) <-
 
 ###   remove redundant columns and create clean dataset  
 
-# sapply(data.all.columns, levels)
 colnames(data.all.columns)[9] <- "Value"
 data.clean <- dplyr::select(data.all.columns, BUILDING_TYPE, REGIONTYPE, ASGS_2016, TIME_PERIOD, Value)
 rm(data.all.columns)
 
 ###   change data types to numeric
 
-data.clean$Value <- as.integer(as.character(data.clean$Value))
-data.clean$TIME_PERIOD <- as.integer(as.character(data.clean$TIME_PERIOD))
+data.clean$Value <- as.integer(as.character(data.clean$Value))              # as.character() is crucial, otherwise values change
+data.clean$TIME_PERIOD <- as.integer(as.character(data.clean$TIME_PERIOD))  # as.character() is crucial, otherwise values change
 # sapply(data.clean, class)
 # sapply(data.clean, levels)
 
 
 ###   Extract one particular time series – Total number of new houses in New South Wales
-
 
 data.Wales <- data.clean[data.clean$ASGS_2016 %in% selected.asgs.2016 &
                          data.clean$BUILDING_TYPE %in% selected.building.type, ]
@@ -153,16 +147,17 @@ data.clean[data.clean$Value == 1511,]
 data.Wales[data.Wales$TIME_PERIOD == 0,]
 
 
-###   convert data to a time-series
 
-# library('forecast')
-data.ts <- ts(data.Wales$Value, start=c(2011,7,1), end=c(2017,7,1), frequency = data.frequency)
+###   convert data to a time-series and have a look
 
-summary(data.ts)
-plot(data.ts)
-# matplot(time(data.ts), data.ts, type='l', lty=1)
-abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
-plot(log(data.ts))
+# data.ts <- ts(data.Wales$Value, start=ts.input$begin, end=ts.input$end, frequency = ts.input$freq)
+# summary(data.ts)
+# plot(data.ts)
+# abline(h=c(range(data.ts), mean(data.ts)), col='red', lty=2)
+
+
+
+
 
 
 
@@ -177,58 +172,70 @@ plot(log(data.ts))
 ##### Running all the models for comparison #####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-source('run_ts_models.R')
 
+###   user input
 valid.sizes = c(6,12,18,24)
 test.sizes = c(12)
 
-time.start <- Sys.time()
-#  2 valid sizes and 2 test.sizes took approx. 7 seconds
+
+###   cleaning the working table
+rm(selected.asgs.2016, selected.building.type, data.ts, data.levels.order.number, data.url.source, data.local.path, data.clean)
+source('run_ts_models.R')
+
+
+###   calling heavy-lifting function that compares the methods
+
+time.start <- Sys.time()  #  2 valid sizes and 2 test.sizes took approx. 7 seconds
 system.time(results <- run_ts_models(data.to.analyze = data.Wales$Value, 
                                      valid.sizes = valid.sizes,
                                      test.sizes = test.sizes,
-                                     ts.start = c(2011,7,1),
-                                     ts.end = c(2017,7,1),
+                                     ts.start = ts.input$begin,
+                                     ts.end = ts.input$end,
                                      ts.freq = 12))
 time.end <- Sys.time()
 time.taken <- time.end - time.start
 time.taken
 
-# lapply(results,class)
-# View(results)
-# colnames(results)
-# mena <- colnames(results)
 
-# results[with(results, order(results$resid.v)),]
+###   displaying the results
 
-## displaying ordered output
-# results <- results[,-c(4,6,8)]
-results <- results[,-c(8)]
-results
-# table.of.results <- results[with(results, order(results$method, results$resid.v.rel)),]
+results <- results[,-c(8)]  # remove the extra column
 table.of.results <- results[with(results, order(results$`relative SSR validation`)),]
 View(table.of.results)
 
 
-## saving and loading the data results
-## table.of.results <- results[with(results, order(results$model, results$resid.v.rel)),]
-save(table.of.results, file='table.of.results')
-load('table.of.results')
+###   saving and loading the data results
+
+# caution, overwrites the file:  save(table.of.results, file='table.of.results')
+load('table.of.results')         # must be in the working directory. hint: getwd()
 View(table.of.results)
 #
 
 
 
-#####     single best model
-selected.test.set.size <- 12
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+##### Checking the best model against testing dataset #####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+rm(time.start, time.end, time.taken, valid.sizes, test.sizes)
 
 
+###   User's input
+
+selected.test.set.size <- 12  #  the final test-set size
+
+
+###   defining training and testing data
+
+data.ts <- ts(data.Wales$Value, start=ts.input$begin, end=ts.input$end, frequency = ts.input$freq)
 train.set.size <- length(data.ts) - selected.test.set.size
 train.ts <- window(data.ts, 
                    end = time(data.ts)[train.set.size])
 test.ts  <- window(data.ts, 
                    start = time(data.ts)[train.set.size + 1])
 
+
+###   Applying the model
 
 ARIMAfit <- auto.arima(train.ts, approximation=FALSE,trace=FALSE)
 
@@ -239,7 +246,9 @@ prediction <- forecast::forecast(ARIMAfit, h = selected.test.set.size)
 
 plot(prediction)
 
+
 ###   compare final model with the test data
+
 matlines(time(test.ts), 
          test.ts, 
          type='l', lty=1, lwd=2, col='red')
@@ -247,27 +256,43 @@ resid.sum.test <- sum(abs(na.remove(prediction$mean - test.ts)))
 resid.sum.valid.relative <- resid.sum.test / sum(test.ts) # 12% in the optimistic direction.
 
 
-###   PREDICT for the next 3 years
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+##### Applying the best model for prediction #####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+###   User's input
 
 selected.months.number = 36  #  selected number of months we want to predict
 img.hline.seq <- seq(1000,4000, by=500)
+ylab.text <- "Number of new houses in Wales"
 
+###   Predictions
+
+##  with testing data in mind
 ARIMAfit <- auto.arima(train.ts, approximation=FALSE,trace=FALSE)
 prediction <- forecast::forecast(ARIMAfit, h = selected.test.set.size + selected.months.number)
 
-par(mfrow=c(1,2))
-plot(prediction)
-matlines(time(test.ts), 
-         test.ts, 
-         type='l', lty=1, lwd=2, col='red')
-abline(h=img.hline.seq, col='red', lty=2)
-
-
-###   using entire dataset for training
+##  using entire dataset for training
 ARIMAfit.full.train <- auto.arima(data.ts, approximation=FALSE,trace=FALSE)
 prediction.full.train  <- forecast::forecast(ARIMAfit.full.train, h = selected.months.number)
 
-plot(prediction.full.train)
-abline(h=img.hline.seq, col='red', lty=2)
+
+###   Visualisation
+
+par(mfrow=c(1,2))
+   # plot(prediction)
+   plot(prediction, ylab = ylab.text, main="Prediction for 3 years with 1 year testing data")
+   matlines(time(test.ts), 
+            test.ts, 
+            type='l', lty=1, lwd=2, col='red')
+   abline(h=img.hline.seq, col='red', lty=2)
+   
+   # plot(prediction.full.train)
+   plot(prediction.full.train, ylab = ylab.text, main="Prediction for 3 years using entire dataset")
+   title(ylab = ylab.text)
+   abline(h=img.hline.seq, col='red', lty=2)
 par(mfrow=c(1,1))
+
 
